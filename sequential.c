@@ -13,17 +13,24 @@ void setValue(int, int);
 int main(int argc, char *argv[]) {
 
 	/* Values hard coded - ensure to update
+	 * debug - The level of debug output: 0, 1, 2
 	 * cores - number of cores to use for the program
 	 * dimension - how big the square array is
-	 * values[][] - change numbers in brackets to match dimension value
 	 * precision - how precise the relaxation needs to be before the program ends
+	 *
+	 * generateNumbers - 0 to use values in setValues[][], 1 to generate them randomly
+	 * textFile[] - text file to read numbers from. Needs to be set and filled in if generateNumbers == 0
 	 */
 
-	int cores = 1; 
-	int dimension = 6;
-	double precision = 0.0000000000000000000000000000000000000001;
-
 	int debug = 0; /* Debug output: 0 no detail - 1 some detail - 2 all detail */
+
+	int cores = 1; 
+	int dimension = 10;
+	double precision = 0.0000000001;
+
+	int generateNumbers = 0;
+	// textFile needs to be set and filled in if generateNumbers == 0
+	char textFile[] = "values.txt";
 	
 	/* End editable values */
 
@@ -71,24 +78,38 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	FILE *valueFile;
 
+	if (!generateNumbers) 
+		valueFile = fopen(textFile, "r");
+
+	/* Set up two arrays, one to store current results & one to store changes */
 	double *values = malloc(dimension * dimension * sizeof(double));
+	double *newValues = malloc(dimension * dimension * sizeof(double));
 	
 	srand((unsigned)time(NULL));
 
-	/* Generate random numbers and put them into values */
+	/* Put numbers into the value arrays */
 	int i, j;
 	for (i = 0; i < dimension; i++) {
 		for (j = 0; j < dimension; j++) {
-			values[i*dimension+j] = fRand(1, 2);
+			// If we're going to generate the numbers, or use predetermined ones
+			if (generateNumbers)
+				values[i*dimension+j] = fRand(1, 2);
+			else
+				fscanf(valueFile, "%lf", &values[i*dimension+j] );
+			// And copy them to the new array as well
+			newValues[i*dimension+j] = values[i*dimension+j];
 		}
 	}
-
+	if (cores < 1) cores = 1;
+	if (cores > 16) cores = 16;
+	if (precision < 0.0000000001) precision = 0.0000000001;
 
 	if (debug >= 1) {
 		fprintf(stdout, "LOG FINE - Using %d cores.\n", cores);
 		fprintf(stdout, "LOG FINE - Using array of dimension %d.\n", dimension);
-		fprintf(stdout, "LOG FINE - Working to precision of %.40lf.\n", precision);
+		fprintf(stdout, "LOG FINE - Working to precision of %.10lf.\n", precision);
 	}
 
 	int count = 0; // Count how many times we try to relax the square array
@@ -113,16 +134,22 @@ int main(int argc, char *argv[]) {
 		// Outside line of square array will remain static so skip it
 		for (i = 1; i < dimension - 1; i++) { // Skip top and bottom
 			for (j = 1; j < dimension - 1; j++) { // Skip left and right
-				double curVal = values[i*dimension+j];
-				values[i*dimension+j] = (values[(i-1)*dimension+j] + values[(i+1)*dimension+j] 
-							  + values[i*dimension+(j-1)] + values[i*dimension+(j+1)]) / 4;
+				// Store relaxed number into new array
+				newValues[i*dimension+j] = (values[(i-1)*dimension+j] + values[(i+1)*dimension+j] 
+							  + values[i*dimension+(j-1)] + values[i*dimension+(j+1)]) / 4.0;
 				/* If the numbers changed more than precision, we need to do it again */
-				if (fabs(curVal - values[i*dimension+j]) > precision) {
+				if (fabs(values[i*dimension+j] - newValues[i*dimension+j]) > precision) {
 					withinPrecision = 0;
 				}
 			}
 		}
+		// Swap pointers, so we can continue working on the new array
+		double *tempValues = values;
+		values = newValues;
+		newValues = tempValues;
 	}
+	/* Switch the pointers around to move the new list to the currently active list */
+
 	if (debug >= 1) 
 		fprintf(stdout, "\nLOG FINE - Program complete. Relaxation count: %d.\n", count);
 	if (debug >= 2) {
@@ -138,6 +165,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	free(values);
+	free(newValues);
 
 	fprintf(stdout, "Program complete.\n");
 }
@@ -147,7 +175,13 @@ double fRand(double fMin, double fMax) {
     return fMin + f * (fMax - fMin);
 }
 
-
+/* Image 2 threads
+ * Give a's to 1, o's to 2
+ * Go through and compute, updating new array with computed result (new array each, or new array both write to)
+ * 
+ *
+ *
+ */
 
 
 
@@ -155,12 +189,16 @@ double fRand(double fMin, double fMax) {
 /* Checkboard for parallelising 
  * a's and o's never interact
  *
- *	x x x x x x
- *	x a o a o x
- *	x o a o a x
- *	x a o a o x
- *	x o a o a x
- *	x x x x x x
+ *	x x x x x x x x x x
+ *	x o o o o o o o o x
+ *	x o o o o o o o o x
+ *	x o o o o o o o o x
+ *	x o o o o o o o o x
+ *	x o o o o o o o o x
+ *	x o o o o o o o o x
+ *	x o o o o o o o o x
+ *	x o o o o o o o o x
+ *	x x x x x x x x x x
  *
  * - Do all a's then all o's
  * - Do diagonals
