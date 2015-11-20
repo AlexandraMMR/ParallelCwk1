@@ -8,7 +8,6 @@
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
-static pthread_barrier_t barrier;
 pthread_mutex_t precisionLock;
 
 double fRand(double, double);
@@ -24,6 +23,7 @@ struct RelaxData {
 };
 
 void* relaxArray(void *td) {
+	fprintf(stdout, "THREAD BEGINS\n");
 	struct RelaxData *data = (struct RelaxData*) td;
 
 	int chunkStart = data->chunkStart;
@@ -36,10 +36,13 @@ void* relaxArray(void *td) {
 	int outOfPrecision = 0;
 
 	int i, j;
+	int startRow = chunkStart / dimension;
+	int endRow = chunkEnd / dimension;
+	int startCol = chunkStart % dimension;
+	int endCol = chunkEnd % dimension;
 
-	for (i = 1; i < dimension - 1; i++) { // Skip top and bottom
-		for (j = 1; j < dimension - 1; j++) { // Skip left and right
-			if ()
+	for (i = startRow; i < endRow + 1; i++) { // Skip top and bottom
+		for (j = startCol; j < endCol + 1; j++) { // Skip left and right
 			// Store relaxed number into new array
 			newValues[i*dimension+j] = (values[(i-1)*dimension+j] + values[(i+1)*dimension+j] 
 						  				+ values[i*dimension+(j-1)] + values[i*dimension+(j+1)]) / 4.0;
@@ -56,6 +59,7 @@ void* relaxArray(void *td) {
 		pthread_mutex_unlock(&precisionLock);
 	}
 
+	fprintf(stdout, "THREAD ENDS\n");
 	return NULL;
 }
 
@@ -201,8 +205,6 @@ int main(int argc, char *argv[]) {
 	int count = 0; // Count how many times we try to relax the square array
 	int withinPrecision = 0; // 1 when pass entirely completed within precision, i.e. finished
 
-	pthread_barrier_init(&barrier, NULL, cores);
-
 	while (!withinPrecision) {
 		count++;
 		withinPrecision = 1;
@@ -251,7 +253,10 @@ int main(int argc, char *argv[]) {
 
 		// Wait for all threads to finish
 		for (i = 0; i < cores; i++)
-			pthread_join(&thread[i], NULL);
+			pthread_join(thread[i], NULL);
+
+
+		fprintf(stdout, "THREADS ALL DONE\n");
 
 /*	 	 o o o o
 		 o o o o 
@@ -281,9 +286,6 @@ int main(int argc, char *argv[]) {
 									}
 								}
 							}*/
-
-		/* Barrier here */
-
 
 		/* Parallelising ends */
 
