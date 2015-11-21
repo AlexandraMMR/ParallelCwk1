@@ -8,6 +8,8 @@
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+#define BILLION 1000000000L
+
 pthread_mutex_t precisionLock;
 
 double fRand(double, double);
@@ -19,11 +21,10 @@ struct RelaxData {
     double *newValues;
     int *withinPrecision;
     int dimension;
-    int precision;
+    double precision;
 };
 
 void* relaxArray(void *td) {
-	fprintf(stdout, "THREAD BEGINS\n");
 	struct RelaxData *data = (struct RelaxData*) td;
 
 	int chunkStart = data->chunkStart;
@@ -32,7 +33,7 @@ void* relaxArray(void *td) {
 	double *newValues = data->newValues;
 	int *withinPrecision = data->withinPrecision;
 	int dimension = data->dimension;
-	int precision = data->precision;
+	double precision = data->precision;
 	int outOfPrecision = 0;
 
 	int i, j;
@@ -48,7 +49,7 @@ void* relaxArray(void *td) {
 						  				+ values[i*dimension+(j-1)] + values[i*dimension+(j+1)]) / 4.0;
 			/* If the numbers changed more than precision, we need to do it again */
 			if (fabs(values[i*dimension+j] - newValues[i*dimension+j]) > precision) {
-				outOfPrecision = 1;	
+				outOfPrecision = 1;
 			}
 		}
 	}
@@ -59,7 +60,6 @@ void* relaxArray(void *td) {
 		pthread_mutex_unlock(&precisionLock);
 	}
 
-	fprintf(stdout, "THREAD ENDS\n");
 	return NULL;
 }
 
@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
 
 	int debug = 0; /* Debug output: 0 no detail - 1 some detail - 2 all detail */
 
-	int cores = 2; 
+	int cores = 4; 
 	int dimension = 10;
 	double precision = 0.0000000001;
 
@@ -87,6 +87,10 @@ int main(int argc, char *argv[]) {
 	char textFile[] = "values.txt";
 	
 	/* End editable values */
+
+
+	struct timespec start, end;
+	clock_gettime(CLOCK_MONOTONIC, &start);
 
 	/* Parse command line input */
 	int a;
@@ -118,6 +122,15 @@ int main(int argc, char *argv[]) {
 					fprintf(stderr, "LOG WARNING - Invalid argument for -p. Positive double required. Using %f precision as default.\n", precision);
 				}
 			}
+		} else if (strcmp(argv[a], "-g") == 0 || strcmp(argv[a], "-generate") == 0) {
+			if (a + 1 <= argc - 1) { /* Make sure we have more arguments */
+				if (atoi(argv[a+1]) >= 0) {
+					a++;
+					generateNumbers = atoi(argv[a]);
+				} else {
+					fprintf(stderr, "LOG WARNING - Invalid argument for -g. Integer >= 0 required. Using %d dimension as default.\n", dimension);
+				}
+			}
 		} else if (strcmp(argv[a], "-debug") == 0) {
 			if (a + 1 <= argc - 1) { /* Make sure we have more arguments */
 				if (atoi(argv[a+1]) >= 0) {
@@ -134,8 +147,13 @@ int main(int argc, char *argv[]) {
 
 	FILE *valueFile;
 
-	if (!generateNumbers) 
+	if (!generateNumbers) {
 		valueFile = fopen(textFile, "r");
+		if (valueFile == NULL) {
+			fprintf(stdout, "LOG ERROR - Failed to open file: %s. Exiting program", textFile);
+			return 1;
+		}
+	}
 
 	/* Set up two arrays, one to store current results & one to store changes */
 	double *values = malloc(dimension * dimension * sizeof(double));
@@ -204,8 +222,8 @@ int main(int argc, char *argv[]) {
 
 	int count = 0; // Count how many times we try to relax the square array
 	int withinPrecision = 0; // 1 when pass entirely completed within precision, i.e. finished
-
-	while (!withinPrecision) {
+ 
+	while (withinPrecision == 0) {
 		count++;
 		withinPrecision = 1;
 
@@ -256,8 +274,6 @@ int main(int argc, char *argv[]) {
 			pthread_join(thread[i], NULL);
 
 
-		fprintf(stdout, "THREADS ALL DONE\n");
-
 /*	 	 o o o o
 		 o o o o 
 		 o o o o 
@@ -290,7 +306,8 @@ int main(int argc, char *argv[]) {
 		/* Parallelising ends */
 
 		// Swap pointers, so we can continue working on the new array
-		double *tempValues = values;
+		double *tempValues;
+		tempValues = values;
 		values = newValues;
 		newValues = tempValues;
 	}
@@ -314,6 +331,11 @@ int main(int argc, char *argv[]) {
 	free(newValues);
 
 	fprintf(stdout, "Program complete.\n");
+	
+	clock_gettime(CLOCK_MONOTONIC, &end);	/* mark the end time */
+
+	diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+	printf("elapsed time = %llu nanoseconds\n", (long long unsigned int) diff);
 }
 
 double fRand(double fMin, double fMax) {
