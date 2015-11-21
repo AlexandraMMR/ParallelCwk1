@@ -3,9 +3,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <stdint.h>
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
+
+#define BILLION 1000000000L
 
 double fRand(double, double);
 void setValue(int, int);
@@ -33,6 +36,10 @@ int main(int argc, char *argv[]) {
 	char textFile[] = "values.txt";
 	
 	/* End editable values */
+
+	uint64_t diff;
+	struct timespec start, end;
+	clock_gettime(CLOCK_MONOTONIC, &start);
 
 	/* Parse command line input */
 	int a;
@@ -62,6 +69,15 @@ int main(int argc, char *argv[]) {
 					precision = atof(argv[a]);
 				} else {
 					fprintf(stderr, "LOG WARNING - Invalid argument for -p. Positive double required. Using %f precision as default.\n", precision);
+				}
+			}
+		} else if (strcmp(argv[a], "-g") == 0 || strcmp(argv[a], "-generate") == 0) {
+			if (a + 1 <= argc - 1) { /* Make sure we have more arguments */
+				if (atoi(argv[a+1]) >= 0) {
+					a++;
+					generateNumbers = atoi(argv[a]);
+				} else {
+					fprintf(stderr, "LOG WARNING - Invalid argument for -g. Integer >= 0 required. Using %d dimension as default.\n", dimension);
 				}
 			}
 		} else if (strcmp(argv[a], "-debug") == 0) {
@@ -105,7 +121,8 @@ int main(int argc, char *argv[]) {
 	if (cores < 1) cores = 1;
 	if (cores > 16) cores = 16;
 	if (precision < 0.0000000001) precision = 0.0000000001;
-
+	if (dimension < 3) dimension = 3;
+	
 	if (debug >= 1) {
 		fprintf(stdout, "LOG FINE - Using %d cores.\n", cores);
 		fprintf(stdout, "LOG FINE - Using array of dimension %d.\n", dimension);
@@ -168,6 +185,11 @@ int main(int argc, char *argv[]) {
 	free(newValues);
 
 	fprintf(stdout, "Program complete.\n");
+
+	clock_gettime(CLOCK_MONOTONIC, &end);	/* mark the end time */
+
+	diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+	printf("elapsed time = %llu nanoseconds\n", (long long unsigned int) diff);
 }
 
 double fRand(double fMin, double fMax) {

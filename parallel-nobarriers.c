@@ -12,7 +12,6 @@
 #define BILLION 1000000000L
 
 pthread_mutex_t precisionLock;
-pthread_barrier_t barrier;
 
 double fRand(double, double);
 void setValue(int, int);
@@ -36,7 +35,7 @@ void* relaxArray(void *td) {
 	int *withinPrecision = data->withinPrecision;
 	int dimension = data->dimension;
 	double precision = data->precision;
-	int outOfPrecision = 1;
+	int outOfPrecision = 0;
 
 	int i, j;
 	int startRow = chunkStart / dimension;
@@ -44,40 +43,22 @@ void* relaxArray(void *td) {
 	int startCol = chunkStart % dimension;
 	int endCol = chunkEnd % dimension;
 
-	while (outOfPrecision) {
-		outOfPrecision = 0;
-		for (i = startRow; i < endRow + 1; i++) { // Skip top and bottom
-			for (j = startCol; j < endCol + 1; j++) { // Skip left and right
-				// Store relaxed number into new array
-				newValues[i*dimension+j] = (values[(i-1)*dimension+j] + values[(i+1)*dimension+j] 
-							  				+ values[i*dimension+(j-1)] + values[i*dimension+(j+1)]) / 4.0;
-				/* If the numbers changed more than precision, we need to do it again */
-				if (fabs(values[i*dimension+j] - newValues[i*dimension+j]) > precision) {
-					outOfPrecision = 1;
-				}
+	for (i = startRow; i < endRow + 1; i++) { // Skip top and bottom
+		for (j = startCol; j < endCol + 1; j++) { // Skip left and right
+			// Store relaxed number into new array
+			newValues[i*dimension+j] = (values[(i-1)*dimension+j] + values[(i+1)*dimension+j] 
+						  				+ values[i*dimension+(j-1)] + values[i*dimension+(j+1)]) / 4.0;
+			/* If the numbers changed more than precision, we need to do it again */
+			if (fabs(values[i*dimension+j] - newValues[i*dimension+j]) > precision) {
+				outOfPrecision = 1;
 			}
 		}
-		
-		if (outOfPrecision) {
-			pthread_mutex_lock(&precisionLock);
-			*withinPrecision = 0;
-			pthread_mutex_unlock(&precisionLock);
-		}
-
-		// Wait until all the newValues are calculated
-		pthread_barrier_wait(&barrier);
-
-		if (*withinPrecision == 0) {
-			outOfPrecision = 1;
-			for (i = startRow; i < endRow + 1; i++) { // Skip top and bottom
-				for (j = startCol; j < endCol + 1; j++) { // Skip left and right
-					// Store relaxed number into new array
-					values[i*dimension+j] = newValues[i*dimension+j];
-				}
-			}
-			// Wait until all the newValues have moved in to values
-			pthread_barrier_wait(&barrier);
-		}		
+	}
+	
+	if (outOfPrecision) {
+		pthread_mutex_lock(&precisionLock);
+		*withinPrecision = 0;
+		pthread_mutex_unlock(&precisionLock);
 	}
 
 	return NULL;
@@ -226,8 +207,6 @@ int main(int argc, char *argv[]) {
 
 	/* Make threads & distribute workload */
 
-    pthread_barrier_init(&barrier, NULL, cores);
-
 	pthread_t thread[cores];
 	struct RelaxData data[cores];
 
@@ -242,60 +221,100 @@ int main(int argc, char *argv[]) {
 
 	/* End thread making */
 
-	int curChunk = 0;
-	int chunksToGive;
+	int count = 0; // Count how many times we try to relax the square array
+	int withinPrecision = 0; // 1 when pass entirely completed within precision, i.e. finished
+ 
+	while (withinPrecision == 0) {
+		count++;
+		withinPrecision = 1;
 
-	int withinPrecision = 0;
+		int curChunk = 0;
+		int chunksToGive;
 
-	for (i = 0; i < cores; i++) {
-		chunksToGive = chunksPerCore;
-		if (remain > 0) { 
-			chunksToGive++;
-			remain--;
+		for (i = 0; i < cores; i++) {
+			chunksToGive = chunksPerCore;
+			if (remain > 0) { 
+				chunksToGive++;
+				remain--;
+			}
+
+			/* curChunk only refers to the actionable array */
+			/* Perform arithmetic to convert position in actionable array to position in full array */
+			data[i].chunkStart = curChunk + ((curChunk / (dimension-2)) * 2) + (dimension+1);
+			data[i].chunkEnd = curChunk + (chunksToGive - 1) + 
+								(((curChunk + (chunksToGive - 1)) / (dimension-2)) * 2) + (dimension+1);
+			
+			curChunk = curChunk + chunksToGive;
+
+			// [0] + (([0] / (d-2)) * 2) + d+1 = 11
+			// [0] + 15 + ((16 / 8) * 2) = 15
+
+			// [4] + (([4] / (d-2)) * 2) + d+1
+			// 4 + ((4/4)*2) + 5
+			// 4 + 2 + 7 = 13
+			
+			// [4] + (chunksToGive-1) + (([7] / (d-2)) * 2) + d+1
+			// [4] + (4-1) + ((7/4)*2) + 5
+			// [4] + (3) + (2) + 7 = 16
+
+			// [0] + 15 + (15 / 4)*2
+			// 0 + 15 + 6 + 7 = 28
+
+			data[i].values = values;
+			data[i].newValues = newValues;
+			data[i].withinPrecision = &withinPrecision;
+			data[i].dimension = dimension;
+			data[i].precision = precision;
+
+			pthread_create(&thread[i], NULL, relaxArray, &data[i]);
 		}
 
-		/* curChunk only refers to the actionable array */
-		/* Perform arithmetic to convert position in actionable array to position in full array */
-		data[i].chunkStart = curChunk + ((curChunk / (dimension-2)) * 2) + (dimension+1);
-		data[i].chunkEnd = curChunk + (chunksToGive - 1) + 
-							(((curChunk + (chunksToGive - 1)) / (dimension-2)) * 2) + (dimension+1);
+
+		// Wait for all threads to finish
+		for (i = 0; i < cores; i++)
+			pthread_join(thread[i], NULL);
+
+
+/*	 	 o o o o
+		 o o o o 
+		 o o o o 
+		 o o o o
+
+	   x x x x x x
+	   x o o o o x
+	   x o o o o x
+	   x o o o o x
+	   x o o o o x
+	   x x x x x x
+*/
+
+		/* Parallise this chunk of code */
+
+		// Outside line of square array will remain static so skip it
 		
-		curChunk = curChunk + chunksToGive;
+							/*for (i = 1; i < dimension - 1; i++) { // Skip top and bottom
+								for (j = 1; j < dimension - 1; j++) { // Skip left and right
+									// Store relaxed number into new array
+									newValues[i*dimension+j] = (values[(i-1)*dimension+j] + values[(i+1)*dimension+j] 
+												  + values[i*dimension+(j-1)] + values[i*dimension+(j+1)]) / 4.0;
+									// If the numbers changed more than precision, we need to do it again
+									if (fabs(values[i*dimension+j] - newValues[i*dimension+j]) > precision) {
+										withinPrecision = 0;
+									}
+								}
+							}*/
 
-		// [0] + (([0] / (d-2)) * 2) + d+1 = 11
-		// [0] + 15 + ((16 / 8) * 2) = 15
+		/* Parallelising ends */
 
-		// [4] + (([4] / (d-2)) * 2) + d+1
-		// 4 + ((4/4)*2) + 5
-		// 4 + 2 + 7 = 13
-		
-		// [4] + (chunksToGive-1) + (([7] / (d-2)) * 2) + d+1
-		// [4] + (4-1) + ((7/4)*2) + 5
-		// [4] + (3) + (2) + 7 = 16
-
-		// [0] + 15 + (15 / 4)*2
-		// 0 + 15 + 6 + 7 = 28
-
-		data[i].values = values;
-		data[i].newValues = newValues;
-		data[i].withinPrecision = &withinPrecision;
-		data[i].dimension = dimension;
-		data[i].precision = precision;
-
-		pthread_create(&thread[i], NULL, relaxArray, &data[i]);
+		// Swap pointers, so we can continue working on the new array
+		double *tempValues = values;
+		values = newValues;
+		newValues = tempValues;
 	}
 
 
-	// Wait for all threads to finish
-	for (i = 0; i < cores; i++)
-		pthread_join(thread[i], NULL);
-
-
-	// Swap pointers, so we have the final array in values
-	double *tempValues = values;
-	values = newValues;
-	newValues = tempValues;
-
+	if (debug >= 1) 
+		fprintf(stdout, "\nLOG FINE - Program complete. Relaxation count: %d.\n", count);
 	if (debug >= 2) {
 		fprintf(stdout, "LOG FINEST - Final array:\n");
 		for (i = 0; i < dimension; i++) {
