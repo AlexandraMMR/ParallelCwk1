@@ -44,20 +44,6 @@ void* relaxArray(void *td) {
 	int startCol = chunkStart % dimension;
 	int endCol = chunkEnd % dimension;
 
-	/* 8 / 7 = 1;
-	 * 24 / 7 = 3;
-	 * 8 % 7 = 1;
-	 * 24 % 7 = 3; 
-	 *
-	 * x x x x x x x
-	 * x o o o o o x
-	 * x o o o o o x
-	 * x o o p o o x
-	 * x o o o o o x
-	 * x o o o o o x
-	 * x x x x x x x
-	 */
-
 	while (outOfPrecision) {
 		outOfPrecision = 0;
 
@@ -296,28 +282,6 @@ int main(int argc, char *argv[]) {
 		
 		curIndex = curIndex + chunkToGive;
 
-		// [0] + (([0] / (d-2)) * 2) + d+1 = 11
-		// [0] + 15 + ((16 / 8) * 2) = 15
-
-		// [4] + (([4] / (d-2)) * 2) + d+1
-		// 4 + ((4/4)*2) + 5
-		// 4 + 2 + 7 = 13
-		
-		// [4] + (chunkToGive-1) + (([7] / (d-2)) * 2) + d+1
-		// [4] + (4-1) + ((7/4)*2) + 5
-		// [4] + (3) + (2) + 7 = 16
-
-		// [0] + 15 + (15 / 4)*2
-		// 0 + 15 + 6 + 7 = 28
-
-		/* o o o o
-		 * o o o o
-		 * o o o o
-		 * o o o o
-
-		 * x x x x x x x
-		 * x o o o o o x*/
-
 		data[i].values = values;
 		data[i].newValues = newValues;
 		data[i].withinPrecision = &withinPrecision;
@@ -378,8 +342,6 @@ double fRand(double fMin, double fMax) {
  */
 
 
-
-
 /* Array
  *
  *	x x x x x x x x x x
@@ -400,13 +362,3 @@ double fRand(double fMin, double fMax) {
  *
  * n dimensions? Talk about, rather than implement
  */
-
-
-
-
- /* chunkStart = j * chunkNum + offset
-  * chunkEnd = (j + 1) * chunkNum + offset - 1
-
-  * cS = 0 * 8 + 0;
-  * cE = 1 * 8 - 1 = 7
-
