@@ -68,7 +68,7 @@ void* relaxArray(void *td) {
 		pthread_barrier_wait(&barrier);
 
 		if (*withinPrecision == 0) {
-			outOfPrecision = 1;
+			outOfPrecision = 1; // So the while loop continues
 			for (i = startRow; i < endRow + 1; i++) { // Skip top and bottom
 				for (j = startCol; j < endCol + 1; j++) { // Skip left and right
 					// Store relaxed number into new array
@@ -76,6 +76,14 @@ void* relaxArray(void *td) {
 				}
 			}
 			// Wait until all the newValues have moved in to values
+			pthread_barrier_wait(&barrier);
+
+			if (*withinPrecision == 0) {
+				pthread_mutex_lock(&precisionLock);
+				*withinPrecision = 1;
+				pthread_mutex_unlock(&precisionLock);
+			}
+
 			pthread_barrier_wait(&barrier);
 		}		
 	}
