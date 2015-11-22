@@ -38,12 +38,6 @@ void* relaxArray(void *td) {
 	double precision = data->precision;
 	int outOfPrecision = 1;
 
-	int i, j;
-	int startRow = chunkStart / dimension;
-	int endRow = chunkEnd / dimension;
-	int startCol = chunkStart % dimension;
-	int endCol = chunkEnd % dimension;
-
 	while (outOfPrecision) {
 		outOfPrecision = 0;
 
