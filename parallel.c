@@ -44,19 +44,42 @@ void* relaxArray(void *td) {
 	int startCol = chunkStart % dimension;
 	int endCol = chunkEnd % dimension;
 
+	/* 8 / 7 = 1;
+	 * 24 / 7 = 3;
+	 * 8 % 7 = 1;
+	 * 24 % 7 = 3; 
+	 *
+	 * x x x x x x x
+	 * x o o o o o x
+	 * x o o o o o x
+	 * x o o p o o x
+	 * x o o o o o x
+	 * x o o o o o x
+	 * x x x x x x x
+	 */
+
 	while (outOfPrecision) {
 		outOfPrecision = 0;
-		for (i = startRow; i < endRow + 1; i++) { // Skip top and bottom
-			for (j = startCol; j < endCol + 1; j++) { // Skip left and right
-				// Store relaxed number into new array
-				newValues[i*dimension+j] = (values[(i-1)*dimension+j] + values[(i+1)*dimension+j] 
-							  				+ values[i*dimension+(j-1)] + values[i*dimension+(j+1)]) / 4.0;
-				/* If the numbers changed more than precision, we need to do it again */
-				if (fabs(values[i*dimension+j] - newValues[i*dimension+j]) > precision) {
-					outOfPrecision = 1;
-				}
+
+		int i;
+		double above, below, left, right;
+
+		for (i = chunkStart; i < chunkEnd + 1; i++) {
+			if ((i % dimension) == 0 || (i % dimension) == (dimension-1))
+				continue;
+
+			// Get the neighbouring values for this index
+			above = values[i-dimension];
+			below = values[i+dimension];
+			left = values[i-1];
+			right = values[i+1];
+			// Set the new value to the average of the neighbouring values
+			newValues[i] = (above + below + left + right) / 4.0;
+
+			if (fabs(values[i] - newValues[i]) > precision) {
+				outOfPrecision = 1;
 			}
-		}
+		} // while loop close
 		
 		if (outOfPrecision) {
 			pthread_mutex_lock(&precisionLock);
@@ -69,15 +92,18 @@ void* relaxArray(void *td) {
 
 		if (*withinPrecision == 0) {
 			outOfPrecision = 1; // So the while loop continues
-			for (i = startRow; i < endRow + 1; i++) { // Skip top and bottom
-				for (j = startCol; j < endCol + 1; j++) { // Skip left and right
-					// Store relaxed number into new array
-					values[i*dimension+j] = newValues[i*dimension+j];
-				}
+			for (i = chunkStart; i < chunkEnd + 1; i++) {
+				if ((i % dimension) == 0 || (i % dimension) == (dimension-1))
+					continue;
+
+				// Move relaxed numbers back into original array
+				values[i] = newValues[i];
 			}
+
 			// Wait until all the newValues have moved in to values
 			pthread_barrier_wait(&barrier);
 
+			// Update withinPrecision back to 1 to reset precision check
 			if (*withinPrecision == 0) {
 				pthread_mutex_lock(&precisionLock);
 				*withinPrecision = 1;
@@ -250,25 +276,25 @@ int main(int argc, char *argv[]) {
 
 	/* End thread making */
 
-	int curChunk = 0;
-	int chunksToGive;
+	int curIndex = 0;
+	int chunkToGive;
 
 	int withinPrecision = 0;
 
 	for (i = 0; i < cores; i++) {
-		chunksToGive = chunksPerCore;
+		chunkToGive = chunksPerCore;
 		if (remain > 0) { 
-			chunksToGive++;
+			chunkToGive++;
 			remain--;
 		}
 
-		/* curChunk only refers to the actionable array */
+		/* curIndex only refers to the actionable array */
 		/* Perform arithmetic to convert position in actionable array to position in full array */
-		data[i].chunkStart = curChunk + ((curChunk / (dimension-2)) * 2) + (dimension+1);
-		data[i].chunkEnd = curChunk + (chunksToGive - 1) + 
-							(((curChunk + (chunksToGive - 1)) / (dimension-2)) * 2) + (dimension+1);
+		data[i].chunkStart = curIndex + ((curIndex / (dimension-2)) * 2) + (dimension+1);
+		data[i].chunkEnd = curIndex + (chunkToGive - 1) + 
+							(((curIndex + (chunkToGive - 1)) / (dimension-2)) * 2) + (dimension+1);
 		
-		curChunk = curChunk + chunksToGive;
+		curIndex = curIndex + chunkToGive;
 
 		// [0] + (([0] / (d-2)) * 2) + d+1 = 11
 		// [0] + 15 + ((16 / 8) * 2) = 15
@@ -277,12 +303,20 @@ int main(int argc, char *argv[]) {
 		// 4 + ((4/4)*2) + 5
 		// 4 + 2 + 7 = 13
 		
-		// [4] + (chunksToGive-1) + (([7] / (d-2)) * 2) + d+1
+		// [4] + (chunkToGive-1) + (([7] / (d-2)) * 2) + d+1
 		// [4] + (4-1) + ((7/4)*2) + 5
 		// [4] + (3) + (2) + 7 = 16
 
 		// [0] + 15 + (15 / 4)*2
 		// 0 + 15 + 6 + 7 = 28
+
+		/* o o o o
+		 * o o o o
+		 * o o o o
+		 * o o o o
+
+		 * x x x x x x x
+		 * x o o o o o x*/
 
 		data[i].values = values;
 		data[i].newValues = newValues;
@@ -366,4 +400,13 @@ double fRand(double fMin, double fMax) {
  *
  * n dimensions? Talk about, rather than implement
  */
+
+
+
+
+ /* chunkStart = j * chunkNum + offset
+  * chunkEnd = (j + 1) * chunkNum + offset - 1
+
+  * cS = 0 * 8 + 0;
+  * cE = 1 * 8 - 1 = 7
 
