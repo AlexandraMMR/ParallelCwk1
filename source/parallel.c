@@ -6,8 +6,8 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_RESET   "\x1b[0m"
+#define ANSI_COLOR_RED     ""
+#define ANSI_COLOR_RESET   ""
 
 #define BILLION 1000000000L
 
@@ -42,12 +42,12 @@ void* relaxArray(void *td) {
 		outOfPrecision = 0;
 
 		int i;
-		double above, below, left, right;
 
 		for (i = chunkStart; i < chunkEnd + 1; i++) {
 			if ((i % dimension) == 0 || (i % dimension) == (dimension-1))
 				continue;
 
+			double above, below, left, right;
 			// Get the neighbouring values for this index
 			above = values[i-dimension];
 			below = values[i+dimension];
@@ -59,7 +59,7 @@ void* relaxArray(void *td) {
 			if (fabs(values[i] - newValues[i]) > precision) {
 				outOfPrecision = 1;
 			}
-		} // while loop close
+		}
 		
 		if (outOfPrecision) {
 			pthread_mutex_lock(&precisionLock);
@@ -76,7 +76,7 @@ void* relaxArray(void *td) {
 				if ((i % dimension) == 0 || (i % dimension) == (dimension-1))
 					continue;
 
-				// Move relaxed numbers back into original array
+				// Move relaxed numbers back into original arra
 				values[i] = newValues[i];
 			}
 
@@ -91,7 +91,8 @@ void* relaxArray(void *td) {
 			}
 
 			pthread_barrier_wait(&barrier);
-		}		
+		}
+					
 	}
 
 	return NULL;
@@ -116,9 +117,9 @@ int main(int argc, char *argv[]) {
 	int dimension = 10;
 	double precision = 0.0000000001;
 
-	int generateNumbers = 0;
+	int generateNumbers = 1;
 	// textFile needs to be set and filled in if generateNumbers == 0
-	char textFile[] = "values.txt";
+	char textFile[] = "scratch/valuesSmall.txt";
 	
 	/* End editable values */
 
@@ -174,6 +175,11 @@ int main(int argc, char *argv[]) {
 					fprintf(stderr, "LOG WARNING - Invalid argument for -debug. Integer >= 0 required. Using %d debug as default.\n", debug);
 				}
 			}
+		} else if (strcmp(argv[a], "-f") == 0 || strcmp(argv[a], "-filepath") == 0) {
+			if (a + 1 <= argc - 1) { /* Make sure we have more arguments */
+				a++;
+				strncpy(textFile, argv[a], sizeof(textFile));
+			}
 		} else {
 			/* Non optional arguments here, but we have none of those */
 		}
@@ -209,9 +215,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	if (cores < 1) cores = 1;
-	if (cores > 16) cores = 16;
 	if (precision < 0.0000000001) precision = 0.0000000001;
-	if (dimension < 3) dimension = 3;
 
 	if (debug >= 1) {
 		fprintf(stdout, "LOG FINE - Using %d cores.\n", cores);
@@ -253,6 +257,8 @@ int main(int argc, char *argv[]) {
 		fprintf(stdout, "\nLOG FINEST - Calculations required: %d\n", chunks);
 		fprintf(stdout, "LOG FINEST - Chunking to size: %d\n", chunksPerCore);
 	}
+
+	
 
 	/* End thread making */
 
@@ -311,48 +317,15 @@ int main(int argc, char *argv[]) {
 	free(values);
 	free(newValues);
 
-	fprintf(stdout, "Program complete.\n");
 
 	clock_gettime(CLOCK_MONOTONIC, &end);	/* mark the end time */
 
 	diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-	printf("elapsed time = %llu nanoseconds\n", (long long unsigned int) diff);
+	if (debug >= 1) printf("LOG FINE - Completed in %llu Nanoseconds\n",  (long long unsigned int) diff);
+	
 }
 
 double fRand(double fMin, double fMax) {
     double f = (double)rand() / RAND_MAX;
     return fMin + f * (fMax - fMin);
 }
-
-// 209171415
-// 4211944359
-
-/* Image 2 threads
- * Give a's to 1, o's to 2
- * Go through and compute, updating new array with computed result (new array each, or new array both write to)
- * 
- *
- *
- */
-
-
-/* Array
- *
- *	x x x x x x x x x x
- *	x o o o o o o o o x
- *	x o o o o o o o o x
- *	x o o o o o o o o x
- *	x o o o o o o o o x
- *	x o o o o o o o o x
- *	x o o o o o o o o x
- *	x o o o o o o o o x
- *	x o o o o o o o o x
- *	x x x x x x x x x x
- *
- * - Do all a's then all o's
- * - Do diagonals
- * - Do radial?
- * - Others?
- *
- * n dimensions? Talk about, rather than implement
- */

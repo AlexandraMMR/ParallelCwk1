@@ -1,0 +1,85 @@
+Thread Count Tests:
+
+Cores: 1 
+Array: 500 x 500
+Precision: 0.1
+Completed in 656575107 Nanoseconds (0.656575107 seconds) -
+
+Cores: 2 
+Array: 500 x 500
+Precision: 0.1
+Completed in 368874173 Nanoseconds (0.368874173 seconds) v
+
+Cores: 4 
+Array: 500 x 500
+Precision: 0.1
+Completed in 226423595 Nanoseconds (0.226523595 seconds) v
+
+Cores: 8 
+Array: 500 x 500
+Precision: 0.1
+Completed in 156137479 Nanoseconds (0.156137479 seconds) v
+
+Cores: 16 
+Array: 500 x 500
+Precision: 0.1
+Completed in 161631392 Nanoseconds (0.161631392 seconds) ^
+
+Cores: 32 
+Array: 500 x 500
+Precision: 0.1
+Completed in 158631929 Nanoseconds (0.158631929 seconds) v
+
+Cores: 64 
+Array: 500 x 500
+Precision: 0.1
+Completed in 195477202 Nanoseconds (0.195477202 seconds) ^
+
+
+
+Dimension Tests:
+
+Cores: 16 
+Array: 10 x 10
+Precision: 0.1
+Completed in 4739820 Nanoseconds (0.004739820 seconds) -
+
+Cores: 16
+Array: 100 x 100
+Precision: 0.1
+Completed in 13273339 Nanoseconds (0.013273339 seconds) ^
+
+Cores: 16
+Array: 1000 x 1000
+Precision: 0.1
+Completed in 452362829 Nanoseconds (0.452362829 seconds) ^
+
+Cores: 16
+Array: 10000 x 10000
+Precision: 0.1
+Completed in uncomplete - Cancelled due to 15m timelimit expiring
+
+
+
+Precision Tests:
+
+Cores: 16 
+Array: 500 x 500
+Precision: 1
+Completed in 83644602 Nanoseconds (0.083644602 seconds) -
+
+Cores: 16
+Array: 500 x 500
+Precision: 0.1
+Completed in 139587870 Nanoseconds (0.139587870 seconds) ^
+
+Cores: 16
+Array: 500 x 500
+Precision: 0.001
+Completed in 33199836617 Nanoseconds (33.199836617 seconds) ^
+
+Cores: 16
+Array: 500 x 500
+Precision: 0.00001
+Completed in 148644991221 Nanoseconds (148.644991221 seconds) ^
+
