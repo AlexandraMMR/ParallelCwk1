@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 
 	int generateNumbers = 0;
 	// textFile needs to be set and filled in if generateNumbers == 0
-	char textFile[] = "valuesSmall.txt";
+	char textFile[] = "values.txt";
 	
 	/* End editable values */
 
@@ -101,8 +101,13 @@ int main(int argc, char *argv[]) {
 
 	FILE *valueFile;
 
-	if (!generateNumbers) 
+	if (!generateNumbers) {
 		valueFile = fopen(textFile, "r");
+		if (valueFile == NULL) {
+			fprintf(stdout, "LOG ERROR - Failed to open file: %s. Exiting program", textFile);
+			return 1;
+		}
+	}
 
 	/* Set up two arrays, one to store current results & one to store changes */
 	double *values = malloc(dimension * dimension * sizeof(double));
