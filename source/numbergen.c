@@ -6,7 +6,6 @@
 
 double fRand(double, double);
 
-// THAT NUMBER GENERATION THO
 int main() {
 	int i;
 	int dimension = 100;

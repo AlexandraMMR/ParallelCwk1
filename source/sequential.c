@@ -80,6 +80,11 @@ int main(int argc, char *argv[]) {
 					fprintf(stderr, "LOG WARNING - Invalid argument for -g. Integer >= 0 required. Using %d dimension as default.\n", dimension);
 				}
 			}
+		} else if (strcmp(argv[a], "-f") == 0 || strcmp(argv[a], "-filepath") == 0) {
+			if (a + 1 <= argc - 1) { /* Make sure we have more arguments */
+				a++;
+				strncpy(textFile, argv[a], sizeof(textFile));
+			}
 		} else if (strcmp(argv[a], "-debug") == 0) {
 			if (a + 1 <= argc - 1) { /* Make sure we have more arguments */
 				if (atoi(argv[a+1]) >= 0) {
