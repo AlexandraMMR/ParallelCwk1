@@ -1,6 +1,13 @@
 # Parallel Computing - Coursework 1
 The first coursework for Final Year Bath Comp Sci, Parallel Computing unit
 
+This zip contains 3 folders:
+Source, Testing
+
+Source - the actual compilable .c code
+Testing - the testing document and the values utilised by it (code run times etc)
+
+
 Compile sequential.c or parallel.c using gcc -Wall -pthread filename.c -lrt
 
 Run the program using ./filename, and possible flags:
