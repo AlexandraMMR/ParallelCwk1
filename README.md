@@ -1,7 +1,7 @@
 # Parallel Computing - Coursework 1
 The first coursework for Final Year Bath Comp Sci, Parallel Computing unit
 
-This zip contains 3 folders:
+This zip contains 2 folders:
 Source, Testing
 
 Source - the actual compilable .c code
